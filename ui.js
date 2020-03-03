@@ -101,7 +101,7 @@ $(async function() {
   $navFavs.on("click", function(){
     hideElements();
     if(currentUser) {
-      generateFavs()
+      generateFavs();
       $favList.show();
     }
   });
@@ -264,6 +264,7 @@ $(async function() {
     if(currentUser) {
       for(let story of currentUser.favorites) {
         let favoriteLi = generateStoryHTML(story);
+        console.log(favoriteLi);
         $favList.append(favoriteLi);
       }
     }
