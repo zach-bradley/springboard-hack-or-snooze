@@ -268,7 +268,6 @@ $(async function() {
         $favList.append(favoriteLi);
       }
     }
- 
   }
 
   function generateMyStories() {
