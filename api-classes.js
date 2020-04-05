@@ -41,14 +41,39 @@ class StoryList {
 
   async addStory(user, newStory) {
     // the script.js file where it will be appended to the DOM
-    const token = user.loginToken;
-    const response = await axios.post(`${BASE_URL}/stories`, {"token": token, "story" : newStory});
-    return response.data;
+    const response = await axios({
+      method: "POST",
+      url: `${BASE_URL}/stories`,
+      data: {
+        // request body
+        // this is the format specified by the API
+        token: user.loginToken,
+        story: newStory,
+      }
+    });
+
+    // make a Story instance out of the story object we get back
+    newStory = new Story(response.data.story);
+    // add the story to the beginning of the list
+    this.stories.unshift(newStory);
+    // add the story to the beginning of the user's list
+    user.ownStories.unshift(newStory);
+
+    return newStory;
   }
 
   async deleteStory(user, storyId) {
-    let token = user.loginToken;
-    await axios.delete(`${BASE_URL}/stories/${storyId}`, {params: {"token": token}});
+    await axios({
+      url: `${BASE_URL}/stories/${storyId}`,
+      method: "DELETE",
+      data: {
+        token: user.loginToken
+      },
+    });
+
+    this.stories = this.stories.filter(story => story.storyId !== storyId);
+
+    user.ownStories = user.ownStories.filter(s => s.storyId !== storyId);
   }
 }
 
@@ -153,17 +178,45 @@ class User {
     return existingUser;
   }
 
-  static async favoriteStory(user, storyId) {
-    let name = user.username;
-    let token = user.loginToken;
-    await axios.post(`${BASE_URL}/users/${name}/favorites/${storyId}`, {"token": token});
+  async retrieveDetails() {
+    const response = await axios.get(`${BASE_URL}/users/${this.username}`, {
+      params: {
+        token: this.loginToken
+      }
+    });
+
+    // update all of the user's properties from the API response
+    this.name = response.data.user.name;
+    this.createdAt = response.data.user.createdAt;
+    this.updatedAt = response.data.user.updatedAt;
+
+    // remember to convert the user's favorites and ownStories into instances of Story
+    this.favorites = response.data.user.favorites.map(s => new Story(s));
+    this.ownStories = response.data.user.stories.map(s => new Story(s));
+
+    return this;
   }
 
-  static async unfavoriteStory(user, storyId) {
-    let name = user.username;
-    let token = user.loginToken;
-    await axios.delete(`${BASE_URL}/users/${name}/favorites/${storyId}`, {params: {"token": token}});
+  favoriteStory(storyId) {
+    return this.toggleFavorite(storyId, "POST");
   }
+
+  removeFavoriteStory(storyId) {
+    return this.toggleFavorite(storyId, "DELETE");
+  }
+
+  async toggleFavorite(storyId ,httpVerb) {
+    await axios({
+      url: `${BASE_URL}/users/${this.username}/favorites/${storyId}`,
+      method: httpVerb,
+      data: {
+        token: this.loginToken
+      }
+    });
+    await this.retrieveDetails();
+    return this;
+  }
+
 
 }
 

@@ -108,7 +108,6 @@ $(async function() {
 
   $myStoriesNav.on("click", function(){
     hideElements();
-    $ownStories.empty();
     if(currentUser){
       generateMyStories();
       $ownStories.show();
@@ -128,40 +127,60 @@ $(async function() {
    */
   $submitForm.on('submit', async function(evt){
     evt.preventDefault();
-    const $author = $('#author').val(); 
-    const $title = $('#title').val(); 
-    const $url = $('#url').val();
-    const story = {
-      "author" : $author,
-      "title" : $title,
-      "url" : $url
-    }
-    const newStory = await storyList.addStory(currentUser, story);
-    const storyHtml = await generateStoryHTML(newStory.story);
-    $allStoriesList.prepend(storyHtml);
+    const author = $('#author').val(); 
+    const title = $('#title').val(); 
+    const url = $('#url').val();
+    const hostName = getHostName(url);
+    const username = currentUser.username
+
+    const storyObject = await storyList.addStory(currentUser, {
+      title,
+      author,
+      url,
+      username
+    });
+    const $li = $(`
+      <li id="${storyObject.storyId}" class="id-${storyObject.storyId}">
+        <span class="star">
+          <i class="far fa-star"></i>
+        </span>
+        <a class="article-link" href="${url}" target="a_blank">
+          <strong>${title}</strong>
+        </a>
+        <small class="article-hostname ${hostName}">(${hostName})</small>
+        <small class="article-author">by ${author}</small>
+        <small class="article-username">posted by ${username}</small>
+      </li>
+    `);
+    $allStoriesList.prepend($li);  
+    $submitForm.slideToggle();
     $submitForm.trigger('reset');
+  
   });
 
     /**
    * Event handler for favoriting a story
    */
-  $(".fa-star").on('click', async function(){
+  $(".articles-list").on('click', ".fa-star", async function(evt){
     if(currentUser) {
-      let storyId = $(this).parent().parent().attr('id');
-      if($(this).hasClass('far')){
-        $(this).toggleClass("fas far");
-        await User.favoriteStory(currentUser, storyId); 
-      } else {
-        $(this).toggleClass("fas far");
-        await User.unfavoriteStory(currentUser, storyId);
+      const $targ = $(evt.target);
+      const $closest = $targ.closest("li");
+      const storyId = $closest.attr("id");
+      if($targ.hasClass('fas')){
+        await currentUser.removeFavoriteStory(storyId); 
+        $targ.closest("i").toggleClass("fas far");
+      } else { 
+        await currentUser.favoriteStory(storyId);
+        $targ.closest("i").toggleClass("fas far");
       }
     } 
   });
 
-  $ownStories.on('click', '#trash', async function(){
-    let storyId = $(this).parent().attr('id');
+  $ownStories.on('click', '#trash', async function(evt){
+    const $closestLi = $(evt.target).closest("li");
+    const storyId = $closestLi.attr("id");
+
     await storyList.deleteStory(currentUser, storyId);
-    console.log(currentUser);
     await generateStories();
     hideElements();
     $allStoriesList.show();
@@ -259,12 +278,11 @@ $(async function() {
 
   /* populates the favorites list */
 
-  function generateFavs() {
+function generateFavs() {
     $favList.empty();
     if(currentUser) {
       for(let story of currentUser.favorites) {
         let favoriteLi = generateStoryHTML(story);
-        console.log(favoriteLi);
         $favList.append(favoriteLi);
       }
     }
@@ -274,18 +292,16 @@ $(async function() {
     $ownStories.empty();
     for(let story of currentUser.ownStories){
       let storyLi = generateStoryHTML(story, true);
-      console.log(storyLi);
       $ownStories.append(storyLi);
     }
+    $ownStories.show();
   }
 
   /* Check if story is a favorite */
   function checkIfFavorite(story) {
-    let favStories;
+    let favStories = new Set();
     if(currentUser) {
       favStories = new Set(currentUser.favorites.map(obj => obj.storyId))
-    } else {
-      return
     }
     return favStories.has(story.storyId);
   }
